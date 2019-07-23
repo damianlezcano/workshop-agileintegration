@@ -16,6 +16,8 @@ oc adm policy remove-scc-from-group anyuid system:authenticated
 
 minishift openshift config set --patch '{"jenkinsPipelineConfig":{"autoProvisionEnabled":false}}'
 
+export REPOSITORY_CREDENTIALS_USERNAME=damianlezcano
+export REPOSITORY_CREDENTIALS_PASSWORD=xxxx
 
 # instalación jenkins
 #-------------------------------------------------------------------------------------------------
@@ -24,7 +26,7 @@ oc login https://$(minishift ip):8443 -u admin
 
 oc new-project jenkins
 
-oc create secret generic repository-credentials --from-file=ssh-privatekey=id_rsa --type=kubernetes.io/ssh-auth -n jenkins
+oc create secret generic repository-credentials --from-file=ssh-privatekey=$HOME/.ssh/id_rsa --type=kubernetes.io/ssh-auth -n jenkins
 oc label secret repository-credentials credential.sync.jenkins.openshift.io=true -n jenkins
 
 oc new-build jenkins:2 --binary --name custom-jenkins -n jenkins
@@ -37,37 +39,36 @@ oc new-app --template=jenkins-persistent --name=jenkins -p JENKINS_IMAGE_STREAM_
 
 oc login https://$(minishift ip):8443 -u admin
 
-oc new-project rh-dev --display-name="DEV"
+oc new-project dev --display-name="DEV"
 
-oc create secret generic repository-credentials --from-file=ssh-privatekey=id_rsa --type=kubernetes.io/ssh-auth -n rh-dev
-oc label secret repository-credentials credential.sync.jenkins.openshift.io=true -n rh-dev
-oc annotate secret repository-credentials 'build.openshift.io/source-secret-match-uri-1=ssh://github.com/*' -n rh-dev
-oc adm policy add-role-to-user edit system:serviceaccount:jenkins:jenkins -n rh-dev
 
-oc create -f ./templates/ci-pipeline.yaml -n rh-dev
-oc create -f ./templates/cd-pipeline.yaml -n rh-dev
+oc create secret generic repository-credentials --from-literal=username=${REPOSITORY_CREDENTIALS_USERNAME} --from-literal=password=${REPOSITORY_CREDENTIALS_PASSWORD} --type=kubernetes.io/basic-auth -n dev
 
-oc new-project rh-test --display-name="TEST"
+oc label secret repository-credentials credential.sync.jenkins.openshift.io=true -n dev
+oc annotate secret repository-credentials 'build.openshift.io/source-secret-match-uri-1=ssh://github.com/*' -n dev
+oc adm policy add-role-to-user edit system:serviceaccount:jenkins:jenkins -n dev
 
-oc create secret generic repository-credentials --from-file=ssh-privatekey=id_rsa --type=kubernetes.io/ssh-auth -n rh-test
-oc label secret repository-credentials credential.sync.jenkins.openshift.io=true -n rh-test
-oc annotate secret repository-credentials 'build.openshift.io/source-secret-match-uri-1=ssh://github.com/*' -n rh-test
-oc adm policy add-role-to-user edit system:serviceaccount:jenkins:jenkins -n rh-test
-oc adm policy add-role-to-user edit system:serviceaccount:rh-dev:jenkins -n rh-test
+oc create -f template-openshift-java-app-deploy.yaml -n dev
 
-oc create -f ./templates/ci-pipeline.yaml -n rh-test
-oc create -f ./templates/cd-pipeline.yaml -n rh-test
+#oc new-project test --display-name="TEST"
 
-oc new-project rh-prod --display-name="PROD"
+#oc create secret generic repository-credentials --from-file=ssh-privatekey=$HOME/.ssh/id_rsa --type=kubernetes.io/ssh-auth -n test
+#oc label secret repository-credentials credential.sync.jenkins.openshift.io=true -n test
+#oc annotate secret repository-credentials 'build.openshift.io/source-secret-match-uri-1=ssh://github.com/*' -n test
+#oc adm policy add-role-to-user edit system:serviceaccount:jenkins:jenkins -n test
+#oc adm policy add-role-to-user edit system:serviceaccount:dev:jenkins -n test
 
-oc create secret generic repository-credentials --from-file=ssh-privatekey=id_rsa --type=kubernetes.io/ssh-auth -n rh-prod
-oc label secret repository-credentials credential.sync.jenkins.openshift.io=true -n rh-prod
-oc annotate secret repository-credentials 'build.openshift.io/source-secret-match-uri-1=ssh://github.com/*' -n rh-prod
-oc adm policy add-role-to-user edit system:serviceaccount:jenkins:jenkins -n rh-prod
-oc adm policy add-role-to-user edit system:serviceaccount:rh-test:jenkins -n rh-prod
+#oc create -f template-openshift-java-app-deploy.yaml -n dev
 
-oc create -f ./templates/ci-pipeline.yaml -n rh-prod
-oc create -f ./templates/cd-pipeline.yaml -n rh-prod
+#oc new-project prod --display-name="PROD"
+
+#oc create secret generic repository-credentials --from-file=ssh-privatekey=$HOME/.ssh/id_rsa --type=kubernetes.io/ssh-auth -n prod
+#oc label secret repository-credentials credential.sync.jenkins.openshift.io=true -n prod
+#oc annotate secret repository-credentials 'build.openshift.io/source-secret-match-uri-1=ssh://github.com/*' -n prod
+#oc adm policy add-role-to-user edit system:serviceaccount:jenkins:jenkins -n prod
+#oc adm policy add-role-to-user edit system:serviceaccount:test:jenkins -n prod
+
+#oc create -f template-openshift-java-app-deploy.yaml -n dev
 
 
 # instalación SSO
@@ -192,21 +193,32 @@ oc new-app --template=3scale-api-management-eval -p ADMIN_PASSWORD=redhat01 -p W
 
 
 
+
+
+
+
+
+
+
+
 # inicio backend y frontend
 
-oc new-app --template ci-pipeline -p APP_NAME=backend-service-ci -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-backend.git -p GIT_BRANCH=master -n rh-dev
-oc new-app --template ci-pipeline -p APP_NAME=frontend-service-ci -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-frontend.git -p GIT_BRANCH=master -e uri=http://backend-service-ci-rh-dev.$(minishift ip).nip.io -n rh-dev
-oc new-app --template cd-pipeline -p APP_NAME=backend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-backend.git -n rh-dev
-oc new-app --template cd-pipeline -p APP_NAME=frontend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-frontend.git -e uri=http://backend-service-cd-rh-dev.$(minishift ip).nip.io -n rh-dev
 
-oc new-app --template cd-pipeline -p APP_NAME=backend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-backend.git -n rh-test
-oc new-app --template cd-pipeline -p APP_NAME=frontend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-frontend.git -e uri=http://backend-service-cd-rh-dev.$(minishift ip).nip.io -n rh-test
+oc new-app -f template-openshift-java-app-deploy.yaml -p APP_NAME=backend-service -p GIT_REPO=https://github.com/damianlezcano/moneda-backend.git -p GIT_BRANCH=master -n dev
 
-oc new-app --template cd-pipeline -p APP_NAME=backend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-backend.git -n rh-prod
-oc new-app --template cd-pipeline -p APP_NAME=frontend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-frontend.git -e uri=http://backend-service-cd-rh-dev.$(minishift ip).nip.io -n rh-prod
+#oc new-app --template deploy-java-app -p APP_NAME=backend-service -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-backend.git -p GIT_BRANCH=master -n dev
+#oc new-app --template ci-pipeline -p APP_NAME=frontend-service-ci -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-frontend.git -p GIT_BRANCH=master -e uri=http://backend-service-ci-dev.$(minishift ip).nip.io -n dev
+#oc new-app --template cd-pipeline -p APP_NAME=backend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-backend.git -n dev
+#oc new-app --template cd-pipeline -p APP_NAME=frontend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-frontend.git -e uri=http://backend-service-cd-dev.$(minishift ip).nip.io -n dev
+
+#oc new-app --template cd-pipeline -p APP_NAME=backend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-backend.git -n test
+#oc new-app --template cd-pipeline -p APP_NAME=frontend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-frontend.git -e uri=http://backend-service-cd-dev.$(minishift ip).nip.io -n test
+
+#oc new-app --template cd-pipeline -p APP_NAME=backend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-backend.git -n prod
+#oc new-app --template cd-pipeline -p APP_NAME=frontend-service-cd -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-frontend.git -e uri=http://backend-service-cd-dev.$(minishift ip).nip.io -n prod
 
 #modificar ruta apicurio a microckslight
 
-oc project apicurio-studio
+#oc project apicurio-studio
 
-oc set env dc/apicurio-studio-api APICURIO_MICROCKS_API_URL=http://microckslight-microcks.$(minishift ip).nip.io/api
+#oc set env dc/apicurio-studio-api APICURIO_MICROCKS_API_URL=http://microckslight-microcks.$(minishift ip).nip.io/api
