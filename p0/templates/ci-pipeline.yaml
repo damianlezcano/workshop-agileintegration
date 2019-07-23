@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: ci-pipeline
+  annotations:
+    openshift.io/display-name: CI Pipeline
+    iconClass: fa fa-code
+objects:
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: ${APP_NAME}
+    name: ${APP_NAME}-pipeline
+  spec:
+    source:
+      type: Git
+      git:
+        uri: ${GIT_REPO}
+        ref: ${GIT_BRANCH}
+      contextDir: ${OPENSHIFT_DIR}/pipelines/ci
+    strategy:
+      jenkinsPipelineStrategy:
+        env:
+        - name: APP_NAME
+          value: ${APP_NAME}
+        - name: OPENSHIFT_DIR
+          value: ${OPENSHIFT_DIR}
+        jenkinsfilePath: Jenkinsfile
+      type: JenkinsPipeline
+    triggers:
+      - generic:
+          allowEnv: true
+          secret: ${WEBHOOK_SECRET}
+        type: Generic
+parameters:
+- description: Application Name
+  displayName: Application Name
+  name: APP_NAME
+  required: true
+- description: Git Repository
+  displayName: Git Repository
+  name: GIT_REPO
+  required: true
+- description: Git Branch
+  displayName: Git Branch
+  name: GIT_BRANCH
+  required: true
+- description: OpenShift Directory
+  displayName: OpenShift Directory
+  name: OPENSHIFT_DIR
+  value: ./openshift
+  required: true
+- description: Webhook Secret
+  displayName: Webhook Secret
+  name: WEBHOOK_SECRET
+  generate: expression 
+  from: "[a-zA-Z0-9]{40}"
