@@ -26,7 +26,7 @@ oc login https://$(minishift ip):8443 -u admin
 
 oc new-project jenkins
 
-oc create secret generic repository-credentials --from-file=ssh-privatekey=$HOME/.ssh/id_rsa --type=kubernetes.io/ssh-auth -n jenkins
+oc create secret generic repository-credentials --from-literal=username=${REPOSITORY_CREDENTIALS_USERNAME} --from-literal=password=${REPOSITORY_CREDENTIALS_PASSWORD} --type=kubernetes.io/basic-auth -n jenkins
 oc label secret repository-credentials credential.sync.jenkins.openshift.io=true -n jenkins
 
 oc new-build jenkins:2 --binary --name custom-jenkins -n jenkins
@@ -41,14 +41,13 @@ oc login https://$(minishift ip):8443 -u admin
 
 oc new-project dev --display-name="DEV"
 
-
 oc create secret generic repository-credentials --from-literal=username=${REPOSITORY_CREDENTIALS_USERNAME} --from-literal=password=${REPOSITORY_CREDENTIALS_PASSWORD} --type=kubernetes.io/basic-auth -n dev
-
 oc label secret repository-credentials credential.sync.jenkins.openshift.io=true -n dev
 oc annotate secret repository-credentials 'build.openshift.io/source-secret-match-uri-1=ssh://github.com/*' -n dev
 oc adm policy add-role-to-user edit system:serviceaccount:jenkins:jenkins -n dev
 
 oc create -f template-openshift-java-app-deploy.yaml -n dev
+
 
 #oc new-project test --display-name="TEST"
 
@@ -203,8 +202,13 @@ oc new-app --template=3scale-api-management-eval -p ADMIN_PASSWORD=redhat01 -p W
 
 # inicio backend y frontend
 
+oc new-app --template java-app-deploy -p APP_NAME=backend-service -p GIT_REPO=https://github.com/damianlezcano/moneda-backend.git -p GIT_BRANCH=master -n dev
+oc new-app --template java-app-deploy -p APP_NAME=frontend -p GIT_REPO=https://github.com/damianlezcano/moneda-frontend.git -p GIT_BRANCH=master -e uri=https://microckslight-secure-microcks.$(minishift ip).nip.io/rest/Moneda/1.0.0-SNAPSHOT -n dev
 
-oc new-app -f template-openshift-java-app-deploy.yaml -p APP_NAME=backend-service -p GIT_REPO=https://github.com/damianlezcano/moneda-backend.git -p GIT_BRANCH=master -n dev
+
+
+#oc new-app -f template-openshift-java-app-deploy.yaml -p APP_NAME=backend-service -p GIT_REPO=https://github.com/damianlezcano/moneda-backend.git -p GIT_BRANCH=master -n dev
+#oc new-app -f template-openshift-java-app-deploy.yaml -p APP_NAME=backend-service -p GIT_REPO=https://github.com/damianlezcano/moneda-backend.git -p GIT_BRANCH=master -n dev
 
 #oc new-app --template deploy-java-app -p APP_NAME=backend-service -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-backend.git -p GIT_BRANCH=master -n dev
 #oc new-app --template ci-pipeline -p APP_NAME=frontend-service-ci -p GIT_REPO=ssh://git@github.com/damianlezcano/moneda-frontend.git -p GIT_BRANCH=master -e uri=http://backend-service-ci-dev.$(minishift ip).nip.io -n dev
